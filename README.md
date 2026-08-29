@@ -2,6 +2,8 @@
 
 An AI-powered document summarization and analysis API built with Spring Boot. Upload PDF, DOCX, or TXT files, extract their text, and get AI-generated summaries — all secured with JWT authentication and scoped per user.
 
+🔗 **[Live Demo](https://docusense-production-d92a.up.railway.app/swagger-ui/index.html)** — try the API directly in your browser
+
 ## Features
 
 - **File upload & text extraction** — single and batch upload for PDF, DOCX, and TXT files, with automatic text extraction via Apache PDFBox and Apache POI
