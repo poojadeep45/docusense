@@ -13,6 +13,8 @@ uploads/
 # Optional extra safety - ignore local properties override
 application-local.properties
 
+.env
+
 ### STS ###
 .apt_generated
 .classpath
