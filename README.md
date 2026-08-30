@@ -1,3 +1,4 @@
+![CI](https://github.com/poojadeep45/docusense/actions/workflows/ci.yml/badge.svg)
 # DocuSense
 
 An AI-powered document summarization and analysis API built with Spring Boot. Upload PDF, DOCX, or TXT files, extract their text, and get AI-generated summaries — all secured with JWT authentication and scoped per user.
