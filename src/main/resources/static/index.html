@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuSense</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+          --paper: #FBF7EE;
+          --paper-dim: #F3EDDE;
+          --ink: #16233D;
+          --ink-soft: #3C4A63;
+          --text: #2A2A28;
+          --rule: #DDD5C2;
+          --highlighter: #F2B705;
+          --highlighter-dim: #FBE7A0;
+          --teal: #3E7C74;
+          --teal-dim: #E2EFEC;
+          --rust: #B4482E;
+          --rust-dim: #F6E2DC;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+          margin: 0;
+          background: var(--paper);
+          color: var(--text);
+          font-family: 'Inter', sans-serif;
+          line-height: 1.5;
+        }
+
+        ::selection { background: var(--highlighter-dim); }
+
+        .topbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 20px 32px;
+          border-bottom: 1px solid var(--rule);
+          background: var(--paper);
+        }
+
+        .brand {
+          font-family: 'Source Serif 4', serif;
+          font-weight: 700;
+          font-size: 22px;
+          color: var(--ink);
+          display: flex;
+          align-items: baseline;
+          gap: 8px;
+        }
+
+        .brand .mark {
+          display: inline-block;
+          width: 10px;
+          height: 10px;
+          background: var(--highlighter);
+          border-radius: 2px;
+          transform: rotate(-6deg);
+        }
+
+        .userbar { display: flex; align-items: center; gap: 14px; font-size: 14px; color: var(--ink-soft); }
+        .userbar button { font-family: inherit; }
+
+        main {
+          max-width: 880px;
+          margin: 0 auto;
+          padding: 48px 24px 96px;
+        }
+
+        .hidden { display: none !important; }
+
+        h1.hero {
+          font-family: 'Source Serif 4', serif;
+          font-size: 40px;
+          font-weight: 600;
+          color: var(--ink);
+          margin: 0 0 6px;
+        }
+
+        .hero-mark {
+          position: relative;
+          display: inline-block;
+        }
+        .hero-mark::after {
+          content: '';
+          position: absolute;
+          left: -4px; right: -4px; bottom: 2px;
+          height: 12px;
+          background: var(--highlighter);
+          opacity: 0.55;
+          z-index: -1;
+          border-radius: 2px;
+          transform: rotate(-0.6deg);
+        }
+
+        .sub { color: var(--ink-soft); font-size: 15px; margin: 0 0 40px; }
+
+        .section-label {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 11px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--teal);
+          margin: 0 0 12px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .section-label::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: var(--rule);
+        }
+
+        .auth-wrap { display: flex; justify-content: center; padding-top: 40px; }
+        .auth-card {
+          background: white;
+          border: 1px solid var(--rule);
+          border-radius: 10px;
+          padding: 36px;
+          width: 100%;
+          max-width: 380px;
+          box-shadow: 0 1px 2px rgba(22,35,61,0.04);
+        }
+        .auth-card h2 {
+          font-family: 'Source Serif 4', serif;
+          font-size: 24px;
+          margin: 0 0 4px;
+          color: var(--ink);
+        }
+        .auth-card p.hint { color: var(--ink-soft); font-size: 13px; margin: 0 0 24px; }
+
+        label {
+          display: block;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--ink-soft);
+          margin: 14px 0 6px;
+        }
+        input[type=text], input[type=password], input[type=email], select {
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px solid var(--rule);
+          border-radius: 7px;
+          font-family: 'Inter', sans-serif;
+          font-size: 14px;
+          background: var(--paper-dim);
+          color: var(--text);
+        }
+        input:focus, select:focus, button:focus-visible {
+          outline: 2px solid var(--teal);
+          outline-offset: 1px;
+        }
+
+        button {
+          cursor: pointer;
+          border: none;
+          border-radius: 7px;
+          font-weight: 600;
+          font-size: 14px;
+          padding: 11px 18px;
+        }
+        .btn-primary { background: var(--ink); color: var(--paper); width: 100%; margin-top: 22px; }
+        .btn-primary:hover { background: var(--ink-soft); }
+        .btn-ghost { background: transparent; color: var(--ink-soft); border: 1px solid var(--rule); }
+        .btn-ghost:hover { border-color: var(--ink-soft); }
+        .btn-link { background: none; color: var(--teal); font-weight: 600; padding: 4px; text-decoration: underline; text-underline-offset: 2px; }
+
+        .auth-switch { text-align: center; margin-top: 18px; font-size: 13px; color: var(--ink-soft); }
+
+        .error-msg {
+          background: var(--rust-dim);
+          color: var(--rust);
+          border-radius: 7px;
+          padding: 10px 12px;
+          font-size: 13px;
+          margin-top: 14px;
+        }
+
+        .dropzone {
+          border: 1.5px dashed var(--rule);
+          border-radius: 10px;
+          background: white;
+          padding: 28px;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 44px;
+          transition: border-color 0.15s;
+        }
+        .dropzone.drag { border-color: var(--teal); background: var(--teal-dim); }
+        .dropzone .icon {
+          width: 40px; height: 40px;
+          border-radius: 8px;
+          background: var(--highlighter-dim);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 18px;
+          flex-shrink: 0;
+        }
+        .dropzone-text { flex: 1; }
+        .dropzone-text strong { display: block; font-size: 14px; color: var(--ink); margin-bottom: 2px; }
+        .dropzone-text span { font-size: 12px; color: var(--ink-soft); }
+        #fileInput { display: none; }
+
+        .doc-card {
+          background: white;
+          border: 1px solid var(--rule);
+          border-radius: 10px;
+          margin-bottom: 12px;
+          overflow: hidden;
+          animation: rise 0.25s ease;
+        }
+        @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        .doc-head {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 16px 18px;
+          cursor: pointer;
+        }
+        .doc-head:hover { background: var(--paper-dim); }
+
+        .filetype-tag {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          font-weight: 500;
+          color: var(--ink-soft);
+          background: var(--paper-dim);
+          border: 1px solid var(--rule);
+          border-radius: 5px;
+          padding: 3px 6px;
+          text-transform: uppercase;
+          flex-shrink: 0;
+        }
+
+        .doc-name { flex: 1; font-size: 14px; font-weight: 500; color: var(--ink); }
+        .doc-meta { font-size: 12px; color: var(--ink-soft); }
+
+        .stamp {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 0.05em;
+          padding: 4px 9px;
+          border-radius: 4px;
+          border: 1.5px dashed currentColor;
+          transform: rotate(-2deg);
+          white-space: nowrap;
+        }
+        .stamp.UPLOADED { color: var(--ink-soft); }
+        .stamp.PROCESSING { color: var(--highlighter); animation: pulse 1.4s infinite; }
+        .stamp.COMPLETED { color: var(--teal); }
+        .stamp.FAILED { color: var(--rust); }
+        @keyframes pulse { 50% { opacity: 0.45; } }
+
+        .doc-body {
+          padding: 0 18px 18px 18px;
+          border-top: 1px solid var(--rule);
+          display: none;
+        }
+        .doc-body.open { display: block; }
+
+        .summary-text {
+          font-size: 14px;
+          line-height: 1.65;
+          color: var(--text);
+          white-space: pre-wrap;
+          margin: 16px 0;
+        }
+        .summary-text.empty { color: var(--ink-soft); font-style: italic; }
+
+        .doc-actions { display: flex; gap: 8px; margin-top: 4px; }
+        .doc-actions button { font-size: 12px; padding: 7px 12px; }
+
+        .empty-state {
+          text-align: center;
+          padding: 60px 20px;
+          color: var(--ink-soft);
+        }
+        .empty-state .icon { font-size: 28px; margin-bottom: 10px; }
+        .empty-state p { font-size: 14px; margin: 4px 0; }
+
+        .toast {
+          position: fixed;
+          bottom: 24px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: var(--ink);
+          color: var(--paper);
+          padding: 11px 18px;
+          border-radius: 8px;
+          font-size: 13px;
+          box-shadow: 0 4px 16px rgba(22,35,61,0.25);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.2s, transform 0.2s;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+
+        @media (max-width: 600px) {
+          h1.hero { font-size: 30px; }
+          .dropzone { flex-direction: column; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="topbar">
+    <div class="brand"><span class="mark"></span>DocuSense</div>
+    <div class="userbar hidden" id="userbar">
+        <span id="whoami"></span>
+        <button class="btn-ghost" onclick="logout()">Log out</button>
+    </div>
+</div>
+
+<main>
+
+    <div id="authView">
+        <div class="auth-wrap">
+            <div class="auth-card">
+                <h2 id="authTitle">Welcome back</h2>
+                <p class="hint" id="authHint">Log in to view your documents.</p>
+
+                <div id="registerFields" class="hidden">
+                    <label for="regEmail">Email</label>
+                    <input type="email" id="regEmail" placeholder="you@example.com">
+                </div>
+
+                <label for="authUsername">Username</label>
+                <input type="text" id="authUsername" placeholder="username">
+
+                <label for="authPassword">Password</label>
+                <input type="password" id="authPassword" placeholder="••••••••">
+
+                <button class="btn-primary" onclick="submitAuth()">Continue</button>
+
+                <div class="error-msg hidden" id="authError"></div>
+
+                <div class="auth-switch">
+                    <span id="switchPrompt">New here?</span>
+                    <button class="btn-link" onclick="toggleAuthMode()">Create an account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="appView" class="hidden">
+        <h1 class="hero"><span class="hero-mark">Your documents,</span><br>understood.</h1>
+        <p class="sub">Upload a file — DocuSense reads it and hands you the summary.</p>
+
+        <div class="section-label">Upload</div>
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+            <div class="icon">📄</div>
+            <div class="dropzone-text">
+                <strong>Drop a file here, or click to browse</strong>
+                <span>PDF, DOCX, or TXT</span>
+            </div>
+            <input type="file" id="fileInput" accept=".pdf,.docx,.txt">
+        </div>
+
+        <div class="section-label">Your documents</div>
+        <div id="docList"></div>
+    </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+    const API = window.location.origin;
+    let token = localStorage.getItem('docusense_token');
+    let username = localStorage.getItem('docusense_username');
+    let isRegisterMode = false;
+    let pollTimer = null;
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2600);
+    }
+
+    function toggleAuthMode() {
+      isRegisterMode = !isRegisterMode;
+      document.getElementById('registerFields').classList.toggle('hidden', !isRegisterMode);
+      document.getElementById('authTitle').textContent = isRegisterMode ? 'Create an account' : 'Welcome back';
+      document.getElementById('authHint').textContent = isRegisterMode ? 'Takes about ten seconds.' : 'Log in to view your documents.';
+      document.getElementById('switchPrompt').textContent = isRegisterMode ? 'Already have an account?' : 'New here?';
+      document.querySelector('#authView .btn-link').textContent = isRegisterMode ? 'Log in instead' : 'Create an account';
+      document.getElementById('authError').classList.add('hidden');
+    }
+
+    async function submitAuth() {
+      const u = document.getElementById('authUsername').value.trim();
+      const p = document.getElementById('authPassword').value;
+      const errEl = document.getElementById('authError');
+      errEl.classList.add('hidden');
+
+      if (!u || !p) { errEl.textContent = 'Username and password are required.'; errEl.classList.remove('hidden'); return; }
+
+      try {
+        let res, body;
+        if (isRegisterMode) {
+          const email = document.getElementById('regEmail').value.trim();
+          body = { username: u, password: p, email: email };
+          res = await fetch(`${API}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        } else {
+          body = { username: u, password: p };
+          res = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        }
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Something went wrong.');
+
+        token = data.token;
+        username = u;
+        localStorage.setItem('docusense_token', token);
+        localStorage.setItem('docusense_username', username);
+        enterApp();
+      } catch (e) {
+        errEl.textContent = e.message;
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('docusense_token');
+      localStorage.removeItem('docusense_username');
+      token = null;
+      clearInterval(pollTimer);
+      document.getElementById('appView').classList.add('hidden');
+      document.getElementById('userbar').classList.add('hidden');
+      document.getElementById('authView').classList.remove('hidden');
+    }
+
+    function enterApp() {
+      document.getElementById('authView').classList.add('hidden');
+      document.getElementById('appView').classList.remove('hidden');
+      document.getElementById('userbar').classList.remove('hidden');
+      document.getElementById('whoami').textContent = username;
+      loadDocuments();
+      clearInterval(pollTimer);
+      pollTimer = setInterval(loadDocuments, 5000);
+    }
+
+    async function authedFetch(path, options = {}) {
+      options.headers = Object.assign({}, options.headers, { 'Authorization': 'Bearer ' + token });
+      const res = await fetch(`${API}${path}`, options);
+      if (res.status === 401 || res.status === 403) { logout(); throw new Error('Session expired.'); }
+      return res;
+    }
+
+    async function loadDocuments() {
+      try {
+        const res = await authedFetch('/api/documents');
+        const docs = await res.json();
+        renderDocs(docs);
+      } catch (e) { /* silent on background poll */ }
+    }
+
+    function renderDocs(docs) {
+      const list = document.getElementById('docList');
+      if (!docs.length) {
+        list.innerHTML = `<div class="empty-state"><div class="icon">🗂️</div><p>No documents yet.</p><p>Upload one above to get started.</p></div>`;
+        return;
+      }
+      list.innerHTML = docs.map(d => `
+        <div class="doc-card">
+          <div class="doc-head" onclick="toggleDoc(${d.docId})">
+            <span class="filetype-tag">${d.fileType}</span>
+            <span class="doc-name">${escapeHtml(d.fileName)}</span>
+            <span class="doc-meta">${d.category ? escapeHtml(d.category.catName) : ''}</span>
+            <span class="stamp ${d.status}">${d.status}</span>
+          </div>
+          <div class="doc-body" id="body-${d.docId}">
+            <div class="summary-text ${d.summary ? '' : 'empty'}">${d.summary ? escapeHtml(d.summary) : 'No summary yet — click Analyze to generate one.'}</div>
+            <div class="doc-actions">
+              <button class="btn-ghost" onclick="analyzeDoc(event, ${d.docId})">Analyze</button>
+              <button class="btn-ghost" onclick="deleteDoc(event, ${d.docId})">Delete</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function toggleDoc(id) {
+      document.getElementById(`body-${id}`).classList.toggle('open');
+    }
+
+    async function analyzeDoc(e, id) {
+      e.stopPropagation();
+      try {
+        await authedFetch(`/api/documents/${id}/analyze`, { method: 'POST' });
+        showToast('Analysis started…');
+        loadDocuments();
+      } catch (err) { showToast(err.message); }
+    }
+
+    async function deleteDoc(e, id) {
+      e.stopPropagation();
+      if (!confirm('Delete this document?')) return;
+      try {
+        await authedFetch(`/api/documents/${id}`, { method: 'DELETE' });
+        showToast('Document deleted.');
+        loadDocuments();
+      } catch (err) { showToast(err.message); }
+    }
+
+    async function uploadFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        showToast('Uploading…');
+        await authedFetch('/api/documents/upload', { method: 'POST', body: formData });
+        showToast('Uploaded — analyzing next is optional.');
+        loadDocuments();
+      } catch (err) { showToast(err.message); }
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    const dz = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) uploadFile(fileInput.files[0]); fileInput.value = ''; });
+    ['dragenter','dragover'].forEach(evt => dz.addEventListener(evt, e => { e.preventDefault(); dz.classList.add('drag'); }));
+    ['dragleave','drop'].forEach(evt => dz.addEventListener(evt, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+    dz.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) uploadFile(f); });
+
+    if (token && username) { enterApp(); }
+</script>
+
+</body>
+</html>
