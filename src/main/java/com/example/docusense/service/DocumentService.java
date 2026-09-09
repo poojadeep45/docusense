@@ -11,7 +11,6 @@ import com.example.docusense.security.CurrentUserProvider;
 import com.example.docusense.security.RateLimiterService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -74,7 +73,7 @@ public class DocumentService {
     @Transactional
     public List<DocumentDto> getAll(){
         User currentUser = currentUserProvider.getCurrentUser();
-        return  documentRepository.findAll()
+        return  documentRepository.findByUser(currentUser)
                 .stream()
                 .map(this::toDto)
                 .toList();
@@ -93,8 +92,12 @@ public class DocumentService {
     }
 
     public void deleteById(Long id){
-        if (!documentRepository.existsById(id)) {
-            throw new EntityNotFoundException("Document not found: "  + id);
+        Document document = documentRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Document not found: "  + id));
+
+        User currentUser = currentUserProvider.getCurrentUser();
+        if (!document.getUser().getUserId().equals(currentUser.getUserId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied");
         }
         documentRepository.deleteById(id);
     }
