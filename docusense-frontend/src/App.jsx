@@ -6,6 +6,8 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
+import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
+import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import DocumentsPage from './pages/DocumentsPage.jsx';
 import CategoriesPage from './pages/CategoriesPage.jsx';
@@ -19,6 +21,8 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             <Route
               element={

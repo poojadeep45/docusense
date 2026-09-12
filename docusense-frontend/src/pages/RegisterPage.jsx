@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import PasswordInput from '../components/PasswordInput.jsx';
+import { offerToSaveCredential } from '../utils/credentials.js';
+import AuthSidePanel from '../components/AuthSidePanel.jsx';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -21,6 +24,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(username.trim(), password, email.trim());
+      offerToSaveCredential(username.trim(), password);
       navigate('/documents');
     } catch (err) {
       setError(err.message);
@@ -41,13 +45,33 @@ export default function RegisterPage() {
 
         <form onSubmit={submit}>
           <label className="field-label">Email</label>
-          <input className="field-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+          <input
+            className="field-input"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+          />
 
           <label className="field-label">Username</label>
-          <input className="field-input" type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
+          <input
+            className="field-input"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="username"
+            autoComplete="username"
+          />
 
           <label className="field-label">Password</label>
-          <input className="field-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+          <PasswordInput
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="new-password"
+          />
+          <p className="field-hint">At least 14 characters, e.g. 'Correct-Horse-Battery9'.</p>
 
           {error && <div className="error-msg">{error}</div>}
 
@@ -60,7 +84,7 @@ export default function RegisterPage() {
           Already have an account? <Link to="/login">Sign in</Link>
         </p>
       </div>
-      <div className="auth-side" />
+        <AuthSidePanel />
     </div>
   );
 }

@@ -40,25 +40,59 @@ export const auth = {
       if (!res.ok) throw new Error(data.message || 'Registration failed.');
       return data;
     }),
-  login: (username, password) =>
+  login: (username, password, rememberMe = false) =>
     fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, rememberMe }),
     }).then(async (res) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Login failed.');
       return data;
     }),
+  forgotPassword: (email) =>
+    fetch(`${API_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Something went wrong.');
+      return data;
+    }),
+  resetPassword: (token, newPassword) =>
+    fetch(`${API_URL}/api/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Could not reset password.');
+      return data;
+    }),
 };
 
 export const documents = {
-  list: (filter) => {
-    let path = '/api/documents';
-    if (filter?.type === 'category') path = `/api/documents?categoryId=${filter.id}`;
-    else if (filter?.type === 'tag') path = `/api/documents?tagId=${filter.id}`;
-    else if (filter?.type === 'search') path = `/api/documents?search=${encodeURIComponent(filter.id)}`;
+  list: (filter, page = 0, size = 10) => {
+    let path = `/api/documents?page=${page}&size=${size}`;
+    if (filter?.type === 'category') path = `/api/documents?categoryId=${filter.id}&page=${page}&size=${size}`;
+    else if (filter?.type === 'tag') path = `/api/documents?tagId=${filter.id}&page=${page}&size=${size}`;
+    else if (filter?.type === 'search') path = `/api/documents?search=${encodeURIComponent(filter.id)}&page=${page}&size=${size}`;
     return request(path);
+  },
+  // Fetches every page and concatenates results — for pages that need the
+  // full document set (counts, charts) rather than one page at a time.
+  listAll: async (filter) => {
+    const pageSize = 100;
+    let page = 0;
+    let all = [];
+    while (true) {
+      const result = await documents.list(filter, page, pageSize);
+      all = all.concat(result.content);
+      if (result.last) break;
+      page += 1;
+    }
+    return all;
   },
   upload: (file, categoryId) => {
     const formData = new FormData();

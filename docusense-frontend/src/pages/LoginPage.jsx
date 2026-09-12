@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import PasswordInput from '../components/PasswordInput.jsx';
+import { offerToSaveCredential } from '../utils/credentials.js';
+import AuthSidePanel from '../components/AuthSidePanel.jsx';
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +23,8 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      await login(username.trim(), password);
+      await login(username.trim(), password, rememberMe);
+      offerToSaveCredential(username.trim(), password);
       navigate('/documents');
     } catch (err) {
       setError(err.message);
@@ -40,10 +45,34 @@ export default function LoginPage() {
 
         <form onSubmit={submit}>
           <label className="field-label">Username</label>
-          <input className="field-input" type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
+          <input
+            className="field-input"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="username"
+            autoComplete="username"
+          />
 
           <label className="field-label">Password</label>
-          <input className="field-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+          <PasswordInput
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="current-password"
+          />
+
+          <div className="field-row-between">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <span>Remember me</span>
+            </label>
+            <Link to="/forgot-password" className="inline-link">Forgot password?</Link>
+          </div>
 
           {error && <div className="error-msg">{error}</div>}
 
@@ -56,7 +85,7 @@ export default function LoginPage() {
           New here? <Link to="/register">Create an account</Link>
         </p>
       </div>
-      <div className="auth-side" />
+      <AuthSidePanel />
     </div>
   );
 }

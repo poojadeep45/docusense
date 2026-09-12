@@ -7,8 +7,8 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(localStorage.getItem('docusense_token'));
   const [username, setUsername] = useState(localStorage.getItem('docusense_username'));
 
-  const login = useCallback(async (u, password) => {
-    const data = await authApi.login(u, password);
+  const login = useCallback(async (u, password, rememberMe = false) => {
+    const data = await authApi.login(u, password, rememberMe);
     localStorage.setItem('docusense_token', data.token);
     localStorage.setItem('docusense_username', u);
     setToken(data.token);
