@@ -1,5 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FileText, Clock, CheckCircle2, XCircle, Plus, Search, Trash2, Tags as TagsIcon } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  FileText, Clock, CheckCircle2, XCircle, Plus, Search, Trash2, Tags as TagsIcon,
+  ArrowUp, ArrowDown, ChevronsUpDown,
+} from 'lucide-react';
 import { documents as docsApi, categories as categoriesApi, tags as tagsApi, SessionExpiredError } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import TopHeader from '../components/TopHeader.jsx';
@@ -8,6 +11,21 @@ import StatusBadge from '../components/StatusBadge.jsx';
 import UploadModal from '../components/UploadModal.jsx';
 import DocumentDetailModal from '../components/DocumentDetailModal.jsx';
 import Toast from '../components/Toast.jsx';
+import Pagination from '../components/Pagination.jsx';
+import { SkeletonStatRow, SkeletonTableRows } from '../components/Skeleton.jsx';
+
+const PAGE_SIZE = 8;
+
+function compareValues(a, b, key) {
+  if (key === 'name') return a.fileName.localeCompare(b.fileName);
+  if (key === 'category') {
+    const an = a.category ? a.category.catName : '';
+    const bn = b.category ? b.category.catName : '';
+    return an.localeCompare(bn);
+  }
+  if (key === 'status') return a.status.localeCompare(b.status);
+  return 0;
+}
 
 export default function DocumentsPage() {
   const { logout } = useAuth();
@@ -19,6 +37,12 @@ export default function DocumentsPage() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [activeDoc, setActiveDoc] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState('asc');
+  const [page, setPage] = useState(1);
+  const [bulkTagOpen, setBulkTagOpen] = useState(false);
 
   const pollRef = useRef(null);
   const searchDebounceRef = useRef(null);
@@ -30,12 +54,14 @@ export default function DocumentsPage() {
     showToast(err.message);
   }, [logout, showToast]);
 
-  const loadDocuments = useCallback(async () => {
+  const loadDocuments = useCallback(async (isInitial = false) => {
     try {
       const data = await docsApi.list(activeFilter.type ? activeFilter : null);
       setDocs(data);
     } catch (err) {
       if (err instanceof SessionExpiredError) logout();
+    } finally {
+      if (isInitial) setLoading(false);
     }
   }, [activeFilter, logout]);
 
@@ -50,15 +76,16 @@ export default function DocumentsPage() {
   useEffect(() => {
     loadCategories();
     loadTags();
-    loadDocuments();
+    loadDocuments(true);
     clearInterval(pollRef.current);
-    pollRef.current = setInterval(loadDocuments, 5000);
+    pollRef.current = setInterval(() => loadDocuments(false), 5000);
     return () => clearInterval(pollRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    loadDocuments();
+    setPage(1);
+    loadDocuments(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFilter]);
 
@@ -72,7 +99,7 @@ export default function DocumentsPage() {
         await docsApi.uploadBatch(files, categoryId);
       }
       showToast('Upload complete.');
-      loadDocuments();
+      loadDocuments(false);
     } catch (err) { handleApiError(err); }
   }
 
@@ -80,7 +107,7 @@ export default function DocumentsPage() {
     try {
       await docsApi.analyze(id);
       showToast('Analysis started…');
-      loadDocuments();
+      loadDocuments(false);
       setActiveDoc(null);
     } catch (err) { handleApiError(err); }
   }
@@ -90,7 +117,7 @@ export default function DocumentsPage() {
     try {
       await docsApi.remove(id);
       showToast('Document deleted.');
-      loadDocuments();
+      loadDocuments(false);
     } catch (err) { handleApiError(err); }
   }
 
@@ -113,12 +140,89 @@ export default function DocumentsPage() {
     }, 350);
   }
 
+  function toggleSort(key) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllOnPage(pageDocs) {
+    setSelectedIds((prev) => {
+      const allSelected = pageDocs.every((d) => prev.has(d.docId));
+      const next = new Set(prev);
+      pageDocs.forEach((d) => (allSelected ? next.delete(d.docId) : next.add(d.docId)));
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    if (!window.confirm(`Delete ${selectedIds.size} document(s)?`)) return;
+    try {
+      await Promise.all(Array.from(selectedIds).map((id) => docsApi.remove(id)));
+      showToast(`Deleted ${selectedIds.size} document(s).`);
+      setSelectedIds(new Set());
+      loadDocuments(false);
+    } catch (err) { handleApiError(err); }
+  }
+
+  async function handleBulkTag(tagId) {
+    try {
+      await Promise.all(Array.from(selectedIds).map((id) => docsApi.addTags(id, [tagId])));
+      showToast(`Tag applied to ${selectedIds.size} document(s).`);
+      setBulkTagOpen(false);
+      setSelectedIds(new Set());
+      loadDocuments(false);
+    } catch (err) { handleApiError(err); }
+  }
+
+  const sortedDocs = useMemo(() => {
+    if (!sortKey) return docs;
+    const arr = [...docs].sort((a, b) => compareValues(a, b, sortKey));
+    return sortDir === 'desc' ? arr.reverse() : arr;
+  }, [docs, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedDocs.length / PAGE_SIZE));
+  const pageDocs = sortedDocs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const counts = {
     total: docs.length,
     processing: docs.filter((d) => d.status === 'PROCESSING' || d.status === 'UPLOADED').length,
     completed: docs.filter((d) => d.status === 'COMPLETED').length,
     failed: docs.filter((d) => d.status === 'FAILED').length,
   };
+
+  function SortHeader({ label, sortKeyName }) {
+    const active = sortKey === sortKeyName;
+    return (
+      <th className="sortable-th" onClick={() => toggleSort(sortKeyName)}>
+        <span>{label}</span>
+        {active ? (sortDir === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : <ChevronsUpDown size={13} className="sort-icon-idle" />}
+      </th>
+    );
+  }
+
+  if (loading) {
+    return (
+      <>
+        <TopHeader title="Documents" subtitle="Every file you've uploaded, its status, and its summary." />
+        <SkeletonStatRow />
+        <div className="table-card"><SkeletonTableRows rows={6} cols={5} /></div>
+      </>
+    );
+  }
+
+  const allOnPageSelected = pageDocs.length > 0 && pageDocs.every((d) => selectedIds.has(d.docId));
 
   return (
     <>
@@ -175,8 +279,35 @@ export default function DocumentsPage() {
         </select>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="bulk-bar">
+          <span>{selectedIds.size} selected</span>
+          <div className="bulk-bar-actions">
+            <div className="bulk-tag-wrapper">
+              <button className="btn-secondary" onClick={() => setBulkTagOpen((o) => !o)}>
+                <TagsIcon size={14} /> Add tag
+              </button>
+              {bulkTagOpen && (
+                <div className="bulk-tag-dropdown">
+                  {tags.length === 0 && <span className="doc-meta">No tags yet.</span>}
+                  {tags.map((t) => (
+                    <button key={t.tagId} className="bulk-tag-option" onClick={() => handleBulkTag(t.tagId)}>
+                      {t.tagName}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button className="btn-secondary danger" onClick={handleBulkDelete}>
+              <Trash2 size={14} /> Delete
+            </button>
+            <button className="btn-secondary" onClick={() => setSelectedIds(new Set())}>Clear</button>
+          </div>
+        </div>
+      )}
+
       <div className="table-card">
-        {docs.length === 0 ? (
+        {pageDocs.length === 0 ? (
           <div className="empty-state">
             <FileText size={28} strokeWidth={1.5} />
             <p>No documents match this view.</p>
@@ -185,16 +316,30 @@ export default function DocumentsPage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Category</th>
+                <th className="checkbox-th">
+                  <input
+                    type="checkbox"
+                    checked={allOnPageSelected}
+                    onChange={() => toggleSelectAllOnPage(pageDocs)}
+                  />
+                </th>
+                <SortHeader label="Name" sortKeyName="name" />
+                <SortHeader label="Category" sortKeyName="category" />
                 <th>Tags</th>
-                <th>Status</th>
+                <SortHeader label="Status" sortKeyName="status" />
                 <th aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
-              {docs.map((d) => (
+              {pageDocs.map((d) => (
                 <tr key={d.docId} className="data-row" onClick={() => setActiveDoc(d)}>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(d.docId)}
+                      onChange={() => toggleSelect(d.docId)}
+                    />
+                  </td>
                   <td>
                     <div className="doc-name-cell">
                       <span className="filetype-tag">{d.fileType}</span>
@@ -224,6 +369,14 @@ export default function DocumentsPage() {
             </tbody>
           </table>
         )}
+
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onChange={setPage}
+          totalItems={sortedDocs.length}
+          pageSize={PAGE_SIZE}
+        />
       </div>
 
       {uploadOpen && (

@@ -3,23 +3,26 @@ import { Plus, Tags as TagsIcon } from 'lucide-react';
 import { tags as tagsApi, documents as docsApi } from '../api.js';
 import TopHeader from '../components/TopHeader.jsx';
 import Toast from '../components/Toast.jsx';
+import { SkeletonTableRows } from '../components/Skeleton.jsx';
 
 export default function TagsPage() {
   const [tags, setTags] = useState([]);
   const [docs, setDocs] = useState([]);
   const [newName, setNewName] = useState('');
   const [toastMessage, setToastMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  async function loadAll() {
+  async function loadAll(isInitial = false) {
     try {
       const [allTags, allDocs] = await Promise.all([tagsApi.list(), docsApi.list()]);
       setTags(allTags);
       setDocs(allDocs);
     } catch (err) { setToastMessage(err.message); }
+    finally { if (isInitial) setLoading(false); }
   }
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { loadAll(true); }, []);
 
   function countFor(tagId) {
     return docs.filter((d) => (d.tags || []).some((t) => t.tagId === tagId)).length;
@@ -29,14 +32,14 @@ export default function TagsPage() {
     e.preventDefault();
     const name = newName.trim();
     if (!name) return;
-    setLoading(true);
+    setSubmitting(true);
     try {
       await tagsApi.create(name);
       setNewName('');
       setToastMessage('Tag created.');
-      loadAll();
+      loadAll(false);
     } catch (err) { setToastMessage(err.message); }
-    finally { setLoading(false); }
+    finally { setSubmitting(false); }
   }
 
   return (
@@ -53,14 +56,16 @@ export default function TagsPage() {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
           />
-          <button className="btn-primary" type="submit" disabled={loading}>
+          <button className="btn-primary" type="submit" disabled={submitting}>
             <Plus size={16} /> Add
           </button>
         </form>
       </div>
 
       <div className="table-card">
-        {tags.length === 0 ? (
+        {loading ? (
+          <SkeletonTableRows rows={4} cols={2} />
+        ) : tags.length === 0 ? (
           <div className="empty-state">
             <TagsIcon size={28} strokeWidth={1.5} />
             <p>No tags yet — create one above.</p>

@@ -3,23 +3,26 @@ import { Plus, FolderKanban } from 'lucide-react';
 import { categories as categoriesApi, documents as docsApi } from '../api.js';
 import TopHeader from '../components/TopHeader.jsx';
 import Toast from '../components/Toast.jsx';
+import { SkeletonTableRows } from '../components/Skeleton.jsx';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState([]);
   const [docs, setDocs] = useState([]);
   const [newName, setNewName] = useState('');
   const [toastMessage, setToastMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  async function loadAll() {
+  async function loadAll(isInitial = false) {
     try {
       const [cats, allDocs] = await Promise.all([categoriesApi.list(), docsApi.list()]);
       setCategories(cats);
       setDocs(allDocs);
     } catch (err) { setToastMessage(err.message); }
+    finally { if (isInitial) setLoading(false); }
   }
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { loadAll(true); }, []);
 
   function countFor(catId) {
     return docs.filter((d) => d.category && d.category.catId === catId).length;
@@ -29,14 +32,14 @@ export default function CategoriesPage() {
     e.preventDefault();
     const name = newName.trim();
     if (!name) return;
-    setLoading(true);
+    setSubmitting(true);
     try {
       await categoriesApi.create(name);
       setNewName('');
       setToastMessage('Category created.');
-      loadAll();
+      loadAll(false);
     } catch (err) { setToastMessage(err.message); }
-    finally { setLoading(false); }
+    finally { setSubmitting(false); }
   }
 
   return (
@@ -53,14 +56,16 @@ export default function CategoriesPage() {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
           />
-          <button className="btn-primary" type="submit" disabled={loading}>
+          <button className="btn-primary" type="submit" disabled={submitting}>
             <Plus size={16} /> Add
           </button>
         </form>
       </div>
 
       <div className="table-card">
-        {categories.length === 0 ? (
+        {loading ? (
+          <SkeletonTableRows rows={4} cols={2} />
+        ) : categories.length === 0 ? (
           <div className="empty-state">
             <FolderKanban size={28} strokeWidth={1.5} />
             <p>No categories yet — create one above.</p>
