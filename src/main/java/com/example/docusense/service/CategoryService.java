@@ -15,7 +15,7 @@ public class CategoryService {
     private CategoryRepository categoryRepository;
 
     public CategoryDto createCategory(String name) {
-        Category category = Category.builder().CatName(name).build();
+        Category category = Category.builder().CatName(name.trim()).build();
         Category savedCategory = categoryRepository.save(category);
         return toDto(savedCategory);
     }

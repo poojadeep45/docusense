@@ -2,6 +2,7 @@ package com.example.docusense.service;
 
 import com.example.docusense.dto.CategoryDto;
 import com.example.docusense.dto.DocumentDto;
+import com.example.docusense.dto.PageResponse;
 import com.example.docusense.dto.TagDto;
 import com.example.docusense.entity.*;
 import com.example.docusense.repository.CategoryRepository;
@@ -11,6 +12,10 @@ import com.example.docusense.security.CurrentUserProvider;
 import com.example.docusense.security.RateLimiterService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,10 +24,14 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class DocumentService {
+
+    private static final Set<String> ALLOWED_FILE_TYPES = Set.of("pdf", "docx", "txt");
+    private static final int MAX_PAGE_SIZE = 100;
 
     @Autowired
     private DocumentRepository documentRepository;
@@ -51,12 +60,18 @@ public class DocumentService {
     @Autowired
     private RateLimiterService rateLimiterService;
 
+    private Pageable buildPageable(int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        return PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "uploadedAt"));
+    }
+
     @Transactional
     public DocumentDto createDocument(String fileName, String fileType, Long CategoryId) {
         Category category = null;
         if (CategoryId != null) {
             category = categoryRepository.findById(CategoryId)
-            .orElseThrow(() -> new EntityNotFoundException("Category not found: "  + CategoryId));
+                    .orElseThrow(() -> new EntityNotFoundException("Category not found: "  + CategoryId));
         }
 
         Document document = Document.builder()
@@ -71,12 +86,12 @@ public class DocumentService {
     }
 
     @Transactional
-    public List<DocumentDto> getAll(){
+    public PageResponse<DocumentDto> getAll(int page, int size){
         User currentUser = currentUserProvider.getCurrentUser();
-        return  documentRepository.findByUser(currentUser)
-                .stream()
-                .map(this::toDto)
-                .toList();
+        Page<DocumentDto> result = documentRepository
+                .findByUser(currentUser, buildPageable(page, size))
+                .map(this::toDto);
+        return PageResponse.from(result);
     }
 
     @Transactional
@@ -130,16 +145,24 @@ public class DocumentService {
     }
 
     public DocumentDto uploadDocument(MultipartFile multipartFile , Long CategoryId) throws IOException {
+        if (multipartFile == null || multipartFile.isEmpty()) {
+            throw new IllegalArgumentException("Uploaded file is empty.");
+        }
+
+        String originalFilename = multipartFile.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank() || !originalFilename.contains(".")) {
+            throw new IllegalArgumentException("File must have a valid name and extension.");
+        }
+
         Category category = null;
         if (CategoryId != null) {
             category = categoryRepository.findById(CategoryId)
-                .orElseThrow(() -> new EntityNotFoundException("Category not found: "  + CategoryId));
+                    .orElseThrow(() -> new EntityNotFoundException("Category not found: "  + CategoryId));
         }
 
-        String OriginalFilename = multipartFile.getOriginalFilename();
-        String fileType = OriginalFilename.substring(OriginalFilename.lastIndexOf(".") + 1).toLowerCase();
+        String fileType = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
 
-        if (!fileType.equals("pdf") &&  !fileType.equals("docx") && !fileType.equals("txt")) {
+        if (!ALLOWED_FILE_TYPES.contains(fileType)) {
             throw new IllegalArgumentException("Unsupported file type: " + fileType + ". Only PDF, DOCX, and TXT are supported.");
         }
 
@@ -147,7 +170,7 @@ public class DocumentService {
         String extractedText = textExtractionService.extractText(new File(storedPath) , fileType );
 
         Document document = Document.builder()
-                .fileName(OriginalFilename)
+                .fileName(originalFilename)
                 .filePath(storedPath)
                 .fileType(fileType)
                 .extractedText(extractedText)
@@ -183,6 +206,9 @@ public class DocumentService {
     }
 
     public List<DocumentDto> uploadBatch(List<MultipartFile> Files, Long categoryId) throws IOException {
+        if (Files == null || Files.isEmpty()) {
+            throw new IllegalArgumentException("No files were provided for batch upload.");
+        }
         List<DocumentDto> results = new ArrayList<>();
         for (MultipartFile file : Files) {
             results.add(uploadDocument(file, categoryId));
@@ -207,32 +233,32 @@ public class DocumentService {
     }
 
     @Transactional
-    public List<DocumentDto> getByCategory(Long categoryId) {
+    public PageResponse<DocumentDto> getByCategory(Long categoryId, int page, int size) {
         User currentUser = currentUserProvider.getCurrentUser();
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new EntityNotFoundException("Category not found: " + categoryId));
 
-        return documentRepository.findByUserAndCategory(currentUser, category)
-                .stream()
-                .map(this::toDto)
-                .toList();
+        Page<DocumentDto> result = documentRepository
+                .findByUserAndCategory(currentUser, category, buildPageable(page, size))
+                .map(this::toDto);
+        return PageResponse.from(result);
     }
 
     @Transactional
-    public List<DocumentDto> getByTag(Long tagId) {
+    public PageResponse<DocumentDto> getByTag(Long tagId, int page, int size) {
         User currentUser = currentUserProvider.getCurrentUser();
-        return documentRepository.findByUserAndTagId(currentUser, tagId)
-                .stream()
-                .map(this::toDto)
-                .toList();
+        Page<DocumentDto> result = documentRepository
+                .findByUserAndTagId(currentUser, tagId, buildPageable(page, size))
+                .map(this::toDto);
+        return PageResponse.from(result);
     }
 
     @Transactional
-    public List<DocumentDto> searchByFileName(String keyword) {
+    public PageResponse<DocumentDto> searchByFileName(String keyword, int page, int size) {
         User currentUser = currentUserProvider.getCurrentUser();
-        return documentRepository.findByUserAndFileNameContainingIgnoreCase(currentUser, keyword)
-                .stream()
-                .map(this::toDto)
-                .toList();
+        Page<DocumentDto> result = documentRepository
+                .findByUserAndFileNameContainingIgnoreCase(currentUser, keyword, buildPageable(page, size))
+                .map(this::toDto);
+        return PageResponse.from(result);
     }
 }

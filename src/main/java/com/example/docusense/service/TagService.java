@@ -15,7 +15,7 @@ public class TagService {
     private TagRepository tagRepository;
 
     public TagDto createTag(String name) {
-        Tag tag = Tag.builder().tagName(name).build();
+        Tag tag = Tag.builder().tagName(name.trim()).build();
         Tag savedTag  = tagRepository.save(tag);
         return toDto(savedTag);
     }

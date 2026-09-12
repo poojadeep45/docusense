@@ -2,6 +2,7 @@ package com.example.docusense.controller;
 
 import com.example.docusense.dto.CategoryDto;
 import com.example.docusense.dto.DocumentDto;
+import com.example.docusense.dto.PageResponse;
 import com.example.docusense.dto.TagDto;
 import com.example.docusense.service.DocumentService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,8 +32,10 @@ public class DocumentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<DocumentDto>> getAllDocuments() {
-        return ResponseEntity.ok(documentService.getAll());
+    public ResponseEntity<PageResponse<DocumentDto>> getAllDocuments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(documentService.getAll(page, size));
     }
 
     @GetMapping("/{id}")
@@ -74,17 +77,26 @@ public class DocumentController {
     }
 
     @GetMapping(params = "categoryId")
-    public ResponseEntity<List<DocumentDto>> getByCategory(@RequestParam Long categoryId) {
-        return ResponseEntity.ok(documentService.getByCategory(categoryId));
+    public ResponseEntity<PageResponse<DocumentDto>> getByCategory(
+            @RequestParam Long categoryId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(documentService.getByCategory(categoryId, page, size));
     }
 
     @GetMapping(params = "tagId")
-    public ResponseEntity<List<DocumentDto>> getByTag(@RequestParam Long tagId) {
-        return ResponseEntity.ok(documentService.getByTag(tagId));
+    public ResponseEntity<PageResponse<DocumentDto>> getByTag(
+            @RequestParam Long tagId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(documentService.getByTag(tagId, page, size));
     }
 
     @GetMapping(params = "search")
-    public ResponseEntity<List<DocumentDto>> search(@RequestParam String search) {
-        return ResponseEntity.ok(documentService.searchByFileName(search));
+    public ResponseEntity<PageResponse<DocumentDto>> search(
+            @RequestParam String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(documentService.searchByFileName(search, page, size));
     }
 }

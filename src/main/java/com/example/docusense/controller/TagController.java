@@ -1,13 +1,14 @@
 package com.example.docusense.controller;
 
+import com.example.docusense.dto.NameRequest;
 import com.example.docusense.dto.TagDto;
 import com.example.docusense.service.TagService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tags")
@@ -17,8 +18,8 @@ public class TagController {
     private TagService tagService;
 
     @PostMapping
-    public ResponseEntity<TagDto> createTag(@RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(tagService.createTag(body.get("name")));
+    public ResponseEntity<TagDto> createTag(@Valid @RequestBody NameRequest body) {
+        return ResponseEntity.ok(tagService.createTag(body.getName()));
     }
 
     @GetMapping
