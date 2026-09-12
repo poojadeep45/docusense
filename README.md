@@ -1,93 +1,86 @@
 ![CI](https://github.com/poojadeep45/docusense/actions/workflows/ci.yml/badge.svg)
+
 # DocuSense
 
-An AI-powered document summarization and analysis API built with Spring Boot. Upload PDF, DOCX, or TXT files, extract their text, and get AI-generated summaries — all secured with JWT authentication and scoped per user.
+An AI-powered document summarization and analysis platform. Upload PDF, DOCX, or TXT files, extract their text, and get AI-generated summaries — all secured with per-user JWT authentication.
 
-🔗 **[Live Demo](https://docusense-production-d92a.up.railway.app/)** — register and try it yourself, no setup required
-🔗 **[API Docs](https://docusense-production-d92a.up.railway.app/swagger-ui/index.html)** — explore the full API via Swagger
+This repo contains two independently deployable projects:
 
-- **Web interface** — a clean, self-contained frontend (no separate build step) with drag-and-drop upload, live status updates, and expandable summaries
-    
-## Features
-
-- **File upload & text extraction** — single and batch upload for PDF, DOCX, and TXT files, with automatic text extraction via Apache PDFBox and Apache POI
-- **AI summarization** — documents are summarized using the Google Gemini API
-- **Async processing** — summarization runs on a background thread pool so upload/analyze requests return immediately (`PROCESSING` → `COMPLETED`), rather than blocking the client
-- **JWT authentication** — register/login endpoints issue JWT tokens; all document data is scoped to the authenticated user
-- **Organization** — categorize documents and attach multiple tags; filter and search by category, tag, or filename
-- **Rate limiting** — per-user rate limiting on AI analysis requests to protect API quota
-- **API documentation** — interactive Swagger UI for exploring and testing every endpoint
-- **Tested** — unit test coverage on core business logic using JUnit 5 and Mockito
-
-## Tech Stack
-
-- **Backend:** Java 17, Spring Boot 4, Spring Web, Spring Data JPA, Spring Security
-- **Database:** MySQL
-- **AI:** Google Gemini API (`gemini-3.5-flash-lite`)
-- **File parsing:** Apache PDFBox, Apache POI
-- **Auth:** JWT (jjwt)
-- **Docs:** springdoc-openapi (Swagger UI)
-- **Testing:** JUnit 5, Mockito
-
-## API Overview
-
-| Method | Endpoint | Description |
+| Project | What it is | README |
 |---|---|---|
-| POST | `/api/auth/register` | Register a new user, returns a JWT |
-| POST | `/api/auth/login` | Log in, returns a JWT |
-| POST | `/api/documents/upload` | Upload a single document |
-| POST | `/api/documents/batch` | Upload multiple documents |
-| GET | `/api/documents` | List your documents (supports `?categoryId=`, `?tagId=`, `?search=`) |
-| GET | `/api/documents/{id}` | Get a single document |
-| DELETE | `/api/documents/{id}` | Delete a document |
-| POST | `/api/documents/{id}/analyze` | Trigger AI summarization (async) |
-| POST | `/api/documents/{id}/tags` | Attach tags to a document |
-| GET / POST | `/api/categories` | List / create categories |
-| GET / POST | `/api/tags` | List / create tags |
+| [`docusense`](./docusense) | Spring Boot REST API — auth, upload, text extraction, AI summarization, categories/tags | [docusense/README.md](./docusense/README.md) |
+| [`docusense-frontend`](./docusense-frontend) | React + Vite dashboard — charts, documents table, bulk actions, dark mode | [docusense-frontend/README.md](./docusense-frontend/README.md) |
 
-Full interactive documentation is available at `/swagger-ui/index.html` once the app is running.
+> **Live demo:** currently offline while the backend is moved to a new host. Both projects run locally with the steps below.
 
-## Setup
+## Architecture
 
-### Prerequisites
-
-- Java 17+
-- Maven
-- MySQL
-- A Google Gemini API key ([aistudio.google.com](https://aistudio.google.com))
-
-### 1. Create the database
-
-```sql
-CREATE DATABASE docusense_db;
+```
+┌──────────────────────┐        HTTP / CORS        ┌───────────────────────┐
+│  docusense-frontend   │ ─────────────────────────▶ │      docusense        │
+│  React 18 + Vite      │ ◀───────────────────────── │  Spring Boot 4 API    │
+│  localhost:5173       │        JSON / JWT           │  localhost:8080       │
+└──────────────────────┘                             └───────────┬───────────┘
+                                                                  │
+                                                     ┌────────────┼────────────┐
+                                                     ▼                         ▼
+                                              ┌─────────────┐         ┌───────────────┐
+                                              │    MySQL     │         │  Gemini API    │
+                                              │  (documents, │         │ (summarization)│
+                                              │  users, etc) │         └───────────────┘
+                                              └─────────────┘
 ```
 
-### 2. Set environment variables
+The backend also ships a minimal, no-build-step web UI of its own (served at `http://localhost:8080`) for quickly poking at the API without running the React app.
 
-The app reads secrets from environment variables — nothing sensitive is stored in the repo:
+## Quickstart (both projects)
 
-| Variable | Description |
-|---|---|
-| `DB_PASSWORD` | Your MySQL password |
-| `GEMINI_API_KEY` | Your Gemini API key |
-| `JWT_SECRET` | A long, random string (256+ bits) used to sign JWTs |
+These are the minimum steps to get end-to-end summarization working locally. See each project's own README for full detail, troubleshooting, and configuration options.
 
-Optionally, `DB_USERNAME` (defaults to `root`).
+1. **Create the database**
+   ```sql
+   CREATE DATABASE docusense_db;
+   ```
+2. **Configure and start the backend**
+   ```bash
+   cd docusense
+   # set required env vars: DB_PASSWORD, GEMINI_API_KEY, JWT_SECRET
+   mvn spring-boot:run
+   ```
+   Runs on `http://localhost:8080`.
+3. **Configure and start the frontend**
+   ```bash
+   cd docusense-frontend
+   npm install
+   cp .env.example .env   # edit VITE_API_URL if the backend isn't on localhost:8080
+   npm run dev
+   ```
+   Runs on `http://localhost:5173`.
+4. **Use it** — open `http://localhost:5173`, register an account, and upload a document. Or hit the API directly via Swagger at `http://localhost:8080/swagger-ui/index.html`.
 
-### 3. Run the app
+## Keeping frontend and backend in sync
 
-```bash
-mvn spring-boot:run
-```
+The two projects agree on three settings — if any of these don't line up, you'll typically see a CORS error or failed requests:
 
-The API starts on `http://localhost:8080`.
+| Setting | Where | Default | Purpose |
+|---|---|---|---|
+| `docusense.cors.allowed-origins` | backend env var | `http://localhost:5173` | Origins the API will accept requests from |
+| `FRONTEND_URL` | backend env var | `http://localhost:5173` | Used to build password-reset links |
+| `VITE_API_URL` | frontend `.env` | `http://localhost:8080` | Where the frontend sends API requests |
 
-### 4. Try it out
+If you change the port or host either service runs on, update all three.
 
-Open `http://localhost:8080/swagger-ui/index.html`, register a user via `/api/auth/register`, click **Authorize** and paste in `Bearer <token>`, then explore the rest of the API.
+## Notes
 
-## Architecture Notes
+- **Password reset emails aren't real yet** — the backend logs the reset link to its own console instead of sending an email. See the backend README's [Email delivery](./docusense/README.md#email-delivery) section.
+- **File storage is local disk** on the backend — fine for local dev, but ephemeral on most free-tier hosts. See the backend README's [Known limitations](./docusense/README.md#known-limitations).
+- **Deployment:** not currently deployed. Railway, Render, and Cloudflare Tunnel were explored; most free-tier hosts now require card verification and the previous Railway trial has expired.
 
-- **Layered structure:** controller → service → repository, with DTOs used at the API boundary to avoid exposing entities directly.
-- **Async AI calls:** summarization is dispatched to a dedicated `AsyncSummaryService` bean (kept separate from `DocumentService` to work around Spring's self-invocation proxy limitation) running on a custom `ThreadPoolTaskExecutor`.
-- **Security:** stateless JWT auth via a custom `OncePerRequestFilter`, with per-user data isolation enforced at the service layer.
+## Tech stack at a glance
+
+- **Backend:** Java 17, Spring Boot 4, Spring Data JPA, Spring Security, MySQL, JWT, Google Gemini API
+- **Frontend:** React 18, Vite, React Router v6, Recharts, plain CSS
+
+## License
+
+_Add license details here._
