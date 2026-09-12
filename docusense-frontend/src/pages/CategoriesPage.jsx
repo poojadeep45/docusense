@@ -15,7 +15,7 @@ export default function CategoriesPage() {
 
   async function loadAll(isInitial = false) {
     try {
-      const [cats, allDocs] = await Promise.all([categoriesApi.list(), docsApi.list()]);
+      const [cats, allDocs] = await Promise.all([categoriesApi.list(), docsApi.listAll()]);
       setCategories(cats);
       setDocs(allDocs);
     } catch (err) { setToastMessage(err.message); }

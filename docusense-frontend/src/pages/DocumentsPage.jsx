@@ -30,6 +30,8 @@ function compareValues(a, b, key) {
 export default function DocumentsPage() {
   const { logout } = useAuth();
   const [docs, setDocs] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [categories, setCategories] = useState([]);
   const [tags, setTags] = useState([]);
   const [activeFilter, setActiveFilter] = useState({ type: null, id: null });
@@ -56,14 +58,16 @@ export default function DocumentsPage() {
 
   const loadDocuments = useCallback(async (isInitial = false) => {
     try {
-      const data = await docsApi.list(activeFilter.type ? activeFilter : null);
-      setDocs(data);
+      const result = await docsApi.list(activeFilter.type ? activeFilter : null, page - 1, PAGE_SIZE);
+      setDocs(result.content);
+      setTotalPages(result.totalPages || 1);
+      setTotalItems(result.totalElements || 0);
     } catch (err) {
       if (err instanceof SessionExpiredError) logout();
     } finally {
       if (isInitial) setLoading(false);
     }
-  }, [activeFilter, logout]);
+  }, [activeFilter, page, logout]);
 
   const loadCategories = useCallback(async () => {
     try { setCategories(await categoriesApi.list()); } catch (err) { handleApiError(err); }
@@ -73,19 +77,39 @@ export default function DocumentsPage() {
     try { setTags(await tagsApi.list()); } catch (err) { handleApiError(err); }
   }, [handleApiError]);
 
+  const [counts, setCounts] = useState({ total: 0, processing: 0, completed: 0, failed: 0 });
+
+  const loadCounts = useCallback(async () => {
+    try {
+      const all = await docsApi.listAll(activeFilter.type ? activeFilter : null);
+      setCounts({
+        total: all.length,
+        processing: all.filter((d) => d.status === 'PROCESSING' || d.status === 'UPLOADED').length,
+        completed: all.filter((d) => d.status === 'COMPLETED').length,
+        failed: all.filter((d) => d.status === 'FAILED').length,
+      });
+    } catch (_) { /* stat cards are non-critical; ignore failures here */ }
+  }, [activeFilter]);
+
   useEffect(() => {
     loadCategories();
     loadTags();
-    loadDocuments(true);
-    clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => loadDocuments(false), 5000);
-    return () => clearInterval(pollRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    loadDocuments(true);
+    clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => {
+      loadDocuments(false);
+      loadCounts();
+    }, 5000);
+    return () => clearInterval(pollRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, activeFilter]);
+
+  useEffect(() => {
     setPage(1);
-    loadDocuments(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFilter]);
 
@@ -125,9 +149,9 @@ export default function DocumentsPage() {
     try {
       await docsApi.addTags(docId, [tagId]);
       showToast('Tag added.');
-      const updated = await docsApi.list(activeFilter.type ? activeFilter : null);
-      setDocs(updated);
-      const refreshed = updated.find((d) => d.docId === docId);
+      const result = await docsApi.list(activeFilter.type ? activeFilter : null, page - 1, PAGE_SIZE);
+      setDocs(result.content);
+      const refreshed = result.content.find((d) => d.docId === docId);
       if (refreshed) setActiveDoc(refreshed);
     } catch (err) { handleApiError(err); }
   }
@@ -186,21 +210,19 @@ export default function DocumentsPage() {
     } catch (err) { handleApiError(err); }
   }
 
-  const sortedDocs = useMemo(() => {
+  // Sorting is applied to the current page only — the backend paginates and
+  // sorts by upload date server-side, so column sorting here re-orders what's
+  // currently visible rather than the full result set across pages.
+  const pageDocs = useMemo(() => {
     if (!sortKey) return docs;
     const arr = [...docs].sort((a, b) => compareValues(a, b, sortKey));
     return sortDir === 'desc' ? arr.reverse() : arr;
   }, [docs, sortKey, sortDir]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedDocs.length / PAGE_SIZE));
-  const pageDocs = sortedDocs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const counts = {
-    total: docs.length,
-    processing: docs.filter((d) => d.status === 'PROCESSING' || d.status === 'UPLOADED').length,
-    completed: docs.filter((d) => d.status === 'COMPLETED').length,
-    failed: docs.filter((d) => d.status === 'FAILED').length,
-  };
+  useEffect(() => {
+    loadCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilter]);
 
   function SortHeader({ label, sortKeyName }) {
     const active = sortKey === sortKeyName;
@@ -374,7 +396,7 @@ export default function DocumentsPage() {
           page={page}
           totalPages={totalPages}
           onChange={setPage}
-          totalItems={sortedDocs.length}
+          totalItems={totalItems}
           pageSize={PAGE_SIZE}
         />
       </div>

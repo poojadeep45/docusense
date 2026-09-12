@@ -15,7 +15,7 @@ export default function TagsPage() {
 
   async function loadAll(isInitial = false) {
     try {
-      const [allTags, allDocs] = await Promise.all([tagsApi.list(), docsApi.list()]);
+      const [allTags, allDocs] = await Promise.all([tagsApi.list(), docsApi.listAll()]);
       setTags(allTags);
       setDocs(allDocs);
     } catch (err) { setToastMessage(err.message); }

@@ -29,7 +29,7 @@ export default function DashboardPage() {
     async function load() {
       try {
         const [allDocs, allCats, allTags] = await Promise.all([
-          docsApi.list(), categoriesApi.list(), tagsApi.list(),
+          docsApi.listAll(), categoriesApi.list(), tagsApi.list(),
         ]);
         if (cancelled) return;
         setDocs(allDocs);
