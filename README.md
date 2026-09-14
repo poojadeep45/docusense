@@ -2,85 +2,233 @@
 
 # DocuSense
 
-An AI-powered document summarization and analysis platform. Upload PDF, DOCX, or TXT files, extract their text, and get AI-generated summaries — all secured with per-user JWT authentication.
+An AI-powered document management platform — upload PDFs, DOCX, or TXT files, get AI-generated summaries, and organize everything with categories and tags. Built as a two-part project: a Spring Boot REST API and a separate React dashboard.
 
-This repo contains two independently deployable projects:
+> **Live demo:** currently offline while the backend is moved to a new host — see [Deployment](#deployment) below. Both halves run locally with the steps in this README.
 
-| Project | What it is | README |
+## What's in this repo
+
+\```
+.
+├── docusense/              # Spring Boot backend (REST API)
+└── docusense-frontend/     # React dashboard (Vite)
+\```
+
+## Architecture at a glance
+
+\```
+┌─────────────────────┐         HTTP / JSON          ┌──────────────────────┐
+│  React Frontend      │ ────────────────────────────▶│  Spring Boot Backend │
+│  (Vite, port 5173)   │◀──────────────────────────── │  (port 8080)         │
+└─────────────────────┘         JWT-authenticated      └──────────┬───────────┘
+                                                                    │
+                                                          ┌─────────┴─────────┐
+                                                          │      MySQL         │
+                                                          └─────────┬─────────┘
+                                                                    │
+                                                          ┌─────────┴─────────┐
+                                                          │  Google Gemini API │
+                                                          │  (summarization)   │
+                                                          └────────────────────┘
+\```
+
+The frontend and backend are fully independent — different languages, different deploy targets, connected only over HTTP with CORS configured on the backend. Either can be swapped out without touching the other, as long as the API contract holds.
+
+## Features
+
+**Backend**
+- File upload & text extraction — single and batch upload for PDF, DOCX, and TXT, via Apache PDFBox and Apache POI
+- AI summarization via the Google Gemini API, run asynchronously so upload/analyze requests return immediately (`PROCESSING` → `COMPLETED`)
+- JWT authentication, with optional "remember me" (30-day tokens instead of the default 24-hour) and a full forgot/reset password flow
+- Input validation on all request bodies: usernames, emails, a 14-character password minimum, safe handling of malformed or oversized uploads
+- Categories and tags for organizing documents; filter and search by category, tag, or filename
+- Pagination on every document-listing endpoint (`?page=`, `?size=`)
+- Per-user rate limiting on AI analysis requests
+- Configurable CORS for local dev and deployed frontends
+- Interactive API docs via Swagger UI
+- Unit test coverage (JUnit 5, Mockito) and CI via GitHub Actions
+
+**Frontend**
+- Multi-page dashboard: Dashboard (charts + overview), Documents, Categories, Tags
+- Dashboard charts — documents by status, by category, top tags, uploads over time (Recharts)
+- Documents table with server-side pagination, sortable columns, search, and category/tag filters
+- Bulk actions — select multiple documents, delete or tag them at once
+- Drag-and-drop or click-to-browse upload, single or batch, with an optional category
+- Full auth UI: login with "remember me", registration, forgot/reset password
+- Show/hide toggle on password fields; attempts to trigger the browser's native "save password" prompt
+- Dark mode, persisted across sessions
+- Loading skeletons instead of blank screens on first load
+
+There's also a minimal, self-contained web UI served directly from the backend (no build step) if you just want to poke at the API without running the React app.
+
+## Tech stack
+
+| Layer | Stack |
+|---|---|
+| Backend | Java 17, Spring Boot 4, Spring Web, Spring Security, Spring Data JPA |
+| Database | MySQL |
+| AI | Google Gemini API (`gemini-3.5-flash-lite`) |
+| File parsing | Apache PDFBox, Apache POI |
+| Auth | JWT (jjwt), Jakarta Bean Validation |
+| API docs | springdoc-openapi (Swagger UI) |
+| Testing | JUnit 5, Mockito |
+| Frontend | React 18, Vite, React Router v6, Recharts, lucide-react |
+| CI/CD | GitHub Actions |
+
+## Quick start (run both locally)
+
+You'll need two terminals.
+
+### 1. Backend
+
+**Create the database:**
+\```sql
+CREATE DATABASE docusense_db;
+\```
+
+**Set environment variables** (nothing sensitive lives in the repo):
+
+| Variable | Description | Required? |
 |---|---|---|
-| [`docusense`](./docusense) | Spring Boot REST API — auth, upload, text extraction, AI summarization, categories/tags | [docusense/README.md](./docusense/README.md) |
-| [`docusense-frontend`](./docusense-frontend) | React + Vite dashboard — charts, documents table, bulk actions, dark mode | [docusense-frontend/README.md](./docusense-frontend/README.md) |
+| `DB_PASSWORD` | Your MySQL password | Yes |
+| `DB_USERNAME` | MySQL username | No — defaults to `root` |
+| `DB_URL` | Full JDBC URL | No — defaults to `jdbc:mysql://localhost:3306/docusense_db` |
+| `GEMINI_API_KEY` | Your Gemini API key ([aistudio.google.com](https://aistudio.google.com)) | Yes |
+| `JWT_SECRET` | A long, random string (256+ bits) used to sign JWTs | Yes |
+| `FRONTEND_URL` | Where the frontend runs, used to build password-reset links | No — defaults to `http://localhost:5173` |
+| `PORT` | Server port | No — defaults to `8080` |
+| `docusense.cors.allowed-origins` | Comma-separated origins allowed to call the API | No — defaults to `http://localhost:5173` |
 
-> **Live demo:** currently offline while the backend is moved to a new host. Both projects run locally with the steps below.
+**Run it:**
+\```bash
+cd docusense
+mvn spring-boot:run
+\```
+Starts on `http://localhost:8080`. Open `http://localhost:8080/swagger-ui/index.html` to explore the API directly — register via `/api/auth/register`, click **Authorize**, paste `Bearer <token>`.
 
-## Architecture
+### 2. Frontend
 
-```
-┌──────────────────────┐        HTTP / CORS        ┌───────────────────────┐
-│  docusense-frontend   │ ─────────────────────────▶ │      docusense        │
-│  React 18 + Vite      │ ◀───────────────────────── │  Spring Boot 4 API    │
-│  localhost:5173       │        JSON / JWT           │  localhost:8080       │
-└──────────────────────┘                             └───────────┬───────────┘
-                                                                  │
-                                                     ┌────────────┼────────────┐
-                                                     ▼                         ▼
-                                              ┌─────────────┐         ┌───────────────┐
-                                              │    MySQL     │         │  Gemini API    │
-                                              │  (documents, │         │ (summarization)│
-                                              │  users, etc) │         └───────────────┘
-                                              └─────────────┘
-```
+\```bash
+cd docusense-frontend
+npm install
+cp .env.example .env   # edit VITE_API_URL if your backend isn't on localhost:8080
+npm run dev
+\```
+Opens at `http://localhost:5173`. Register an account and you're in.
 
-The backend also ships a minimal, no-build-step web UI of its own (served at `http://localhost:8080`) for quickly poking at the API without running the React app.
+## API reference
 
-## Quickstart (both projects)
+### Auth
 
-These are the minimum steps to get end-to-end summarization working locally. See each project's own README for full detail, troubleshooting, and configuration options.
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/auth/register` | Register a new user, returns a JWT |
+| POST | `/api/auth/login` | Log in; body accepts `rememberMe: boolean` for a 30-day token instead of 24-hour |
+| POST | `/api/auth/forgot-password` | Request a password reset link for an email |
+| POST | `/api/auth/reset-password` | Reset a password using a valid token |
 
-1. **Create the database**
-   ```sql
-   CREATE DATABASE docusense_db;
-   ```
-2. **Configure and start the backend**
-   ```bash
-   cd docusense
-   # set required env vars: DB_PASSWORD, GEMINI_API_KEY, JWT_SECRET
-   mvn spring-boot:run
-   ```
-   Runs on `http://localhost:8080`.
-3. **Configure and start the frontend**
-   ```bash
-   cd docusense-frontend
-   npm install
-   cp .env.example .env   # edit VITE_API_URL if the backend isn't on localhost:8080
-   npm run dev
-   ```
-   Runs on `http://localhost:5173`.
-4. **Use it** — open `http://localhost:5173`, register an account, and upload a document. Or hit the API directly via Swagger at `http://localhost:8080/swagger-ui/index.html`.
+### Documents
 
-## Keeping frontend and backend in sync
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/documents/upload` | Upload a single document |
+| POST | `/api/documents/batch` | Upload multiple documents |
+| GET | `/api/documents` | List your documents, paginated (`?page=0&size=10`) |
+| GET | `/api/documents?categoryId=` | Filter by category, paginated |
+| GET | `/api/documents?tagId=` | Filter by tag, paginated |
+| GET | `/api/documents?search=` | Search by filename, paginated |
+| GET | `/api/documents/{id}` | Get a single document |
+| DELETE | `/api/documents/{id}` | Delete a document |
+| POST | `/api/documents/{id}/analyze` | Trigger AI summarization (async) |
+| POST | `/api/documents/{id}/tags` | Attach tags to a document |
 
-The two projects agree on three settings — if any of these don't line up, you'll typically see a CORS error or failed requests:
+All list endpoints return a page object:
+\```json
+{
+  "content": [ ... ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 42,
+  "totalPages": 5,
+  "first": true,
+  "last": false
+}
+\```
 
-| Setting | Where | Default | Purpose |
-|---|---|---|---|
-| `docusense.cors.allowed-origins` | backend env var | `http://localhost:5173` | Origins the API will accept requests from |
-| `FRONTEND_URL` | backend env var | `http://localhost:5173` | Used to build password-reset links |
-| `VITE_API_URL` | frontend `.env` | `http://localhost:8080` | Where the frontend sends API requests |
+### Categories & Tags
 
-If you change the port or host either service runs on, update all three.
+| Method | Endpoint | Description |
+|---|---|---|
+| GET / POST | `/api/categories` | List / create categories |
+| GET / POST | `/api/tags` | List / create tags |
 
-## Notes
+Full interactive documentation is available at `/swagger-ui/index.html` once the backend is running.
 
-- **Password reset emails aren't real yet** — the backend logs the reset link to its own console instead of sending an email. See the backend README's [Email delivery](./docusense/README.md#email-delivery) section.
-- **File storage is local disk** on the backend — fine for local dev, but ephemeral on most free-tier hosts. See the backend README's [Known limitations](./docusense/README.md#known-limitations).
-- **Deployment:** not currently deployed. Railway, Render, and Cloudflare Tunnel were explored; most free-tier hosts now require card verification and the previous Railway trial has expired.
+## Email delivery
 
-## Tech stack at a glance
+Forgot-password currently **logs the reset link to the backend's server console** instead of sending a real email — this keeps local setup free of SMTP credentials. Look for a block like this in your terminal output after calling `/api/auth/forgot-password`:
 
-- **Backend:** Java 17, Spring Boot 4, Spring Data JPA, Spring Security, MySQL, JWT, Google Gemini API
-- **Frontend:** React 18, Vite, React Router v6, Recharts, plain CSS
+\```
+=================================================================
+PASSWORD RESET requested for: someone@example.com
+Reset link (valid for 30 minutes): http://localhost:5173/reset-password?token=...
+=================================================================
+\```
 
-## License
+Swapping this for a real provider (SMTP, SendGrid, Mailgun, etc.) only requires changing `EmailService.java` on the backend — nothing else in either codebase talks to email directly.
 
-_Add license details here._
+## Frontend project structure
+
+\```
+docusense-frontend/
+├── index.html
+├── package.json
+├── vite.config.js
+├── .env.example
+└── src/
+    ├── main.jsx              # entry point
+    ├── App.jsx               # routes
+    ├── api.js                # fetch wrapper for the DocuSense API
+    ├── styles.css
+    ├── context/
+    │   ├── AuthContext.jsx   # auth state, login/register/logout
+    │   └── ThemeContext.jsx  # light/dark mode
+    ├── layouts/
+    │   └── DashboardLayout.jsx
+    ├── utils/
+    │   └── credentials.js    # browser "save password" prompt helper
+    ├── pages/
+    │   ├── LoginPage.jsx, RegisterPage.jsx
+    │   ├── ForgotPasswordPage.jsx, ResetPasswordPage.jsx
+    │   ├── DashboardPage.jsx, DocumentsPage.jsx
+    │   └── CategoriesPage.jsx, TagsPage.jsx
+    └── components/
+        ├── Sidebar.jsx, TopHeader.jsx, ThemeToggle.jsx
+        ├── StatCard.jsx, StatusBadge.jsx, Skeleton.jsx
+        ├── Modal.jsx, UploadModal.jsx, DocumentDetailModal.jsx
+        ├── PasswordInput.jsx, Pagination.jsx, Toast.jsx
+        ├── AuthSidePanel.jsx, ProtectedRoute.jsx
+\```
+
+## Backend architecture notes
+
+- **Layered structure:** controller → service → repository, with DTOs at the API boundary so entities are never exposed directly.
+- **Async AI calls:** summarization is dispatched to a dedicated `AsyncSummaryService` bean (kept separate from `DocumentService` to work around Spring's self-invocation proxy limitation), running on a custom `ThreadPoolTaskExecutor`.
+- **Security:** stateless JWT auth via a custom `OncePerRequestFilter`, with per-user data isolation enforced at the service layer. Password reset tokens are single-use and time-limited (30 minutes); the forgot-password endpoint responds identically whether or not an email is registered, to avoid leaking account existence.
+- **Validation:** request DTOs use Jakarta Bean Validation annotations; a `GlobalExceptionHandler` translates validation failures, not-found errors, and oversized uploads into consistent JSON error responses.
+
+## Known limitations
+
+- **File storage is local disk** on the backend (`docusense.upload-dir`). Most free-tier hosting platforms have an ephemeral filesystem, so uploaded files are lost on redeploy or restart. Fine for local dev; needs swapping to object storage (S3-compatible, Cloudinary, etc.) before relying on it in a persistent deployment.
+- **Password reset emails aren't actually sent** — see [Email delivery](#email-delivery) above.
+- **Documents-table column sorting on the frontend only reorders the current page**, not the full result set across pages, since the backend sorts by upload date server-side and has no `sort` query param yet.
+- **Categories, Tags, and Dashboard pages fetch every document** (looping through all backend pages) to compute counts and chart data, since there's no dedicated aggregate/count endpoint. Fine at small-to-moderate scale.
+- **The browser "save password" prompt** only works over HTTPS or localhost, and only in browsers supporting the Credential Management API (not Safari).
+
+## Deployment
+
+Not currently deployed. Free-tier hosting options were explored (Railway, Render, Cloudflare Tunnel) — most now require card verification even on their free tiers, and the previous Railway trial has expired. Revisit this section once a hosting decision is made.
+
+## Status
+
+Actively developed as a learning/portfolio project. Both halves have working test coverage and CI, and run end-to-end locally per the quick start above.
