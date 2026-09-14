@@ -119,7 +119,7 @@ public class DocumentServiceTest {
 
     @Test
     void delete_whenDocumentDoesNotExist_throwsEntityNotFoundException() {
-        when(documentRepository.existsById(99L)).thenReturn(false);
+        when(documentRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(EntityNotFoundException.class, () -> documentService.deleteById(99L));
     }
