@@ -18,6 +18,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -78,8 +80,8 @@ class AuthServiceTest {
 
     @Test
     void login_withValidCredentials_returnsToken() {
-        AuthRequest loginRequest = new AuthRequest("pooja", "test1234");
-        when(jwtUtil.generateToken("pooja")).thenReturn("fake.jwt.token");
+        AuthRequest loginRequest = new AuthRequest("pooja", "test1234", false);
+        when(jwtUtil.generateToken(eq("pooja"), anyLong())).thenReturn("fake.jwt.token");
 
         AuthResponse response = authService.login(loginRequest);
 
@@ -89,7 +91,7 @@ class AuthServiceTest {
 
     @Test
     void login_withInvalidCredentials_throwsBadCredentialsException() {
-        AuthRequest loginRequest = new AuthRequest("pooja", "wrongpassword");
+        AuthRequest loginRequest = new AuthRequest("pooja", "wrongpassword", false);
         when(authenticationManager.authenticate(any()))
                 .thenThrow(new BadCredentialsException("Bad credentials"));
 
