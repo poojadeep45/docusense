@@ -167,7 +167,7 @@ public class DocumentService {
         }
 
         String storedPath = fileStorageService.store(multipartFile);
-        String extractedText = textExtractionService.extractText(new File(storedPath) , fileType );
+        String extractedText = textExtractionService.extractText(multipartFile , fileType );
 
         Document document = Document.builder()
                 .fileName(originalFilename)
